@@ -1,0 +1,567 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Aseprite Theme Editor — Frigus Nox</title>
+<style>
+  :root {
+    --text:#e7e9eb; --text_hot:#2c3037; --detail_text:#21252b; --disabled:#5c6470;
+    --face:#2c3037; --hot_face:#3a4f6b; --selected:#eeac4d; --selected_text:#2c3037;
+    --separator_label:#6d95c0; --background:#2c3037; --textbox_text:#e7e9eb; --textbox_face:#2c3037;
+    --textbox_code_face:#363b44; --entry_suffix:#c6c6c6; --link_text:#6d95c0; --link_hover:#eeac4d;
+    --button_normal_text:#e7e9eb; --button_hot_text:#e7e9eb; --button_selected_text:#e7e9eb;
+    --check_hot_face:#3a4f6b; --check_focus_face:#587584; --radio_hot_face:#3a4f6b; --radio_focus_face:#587584;
+    --menuitem_normal_text:#e7e9eb; --menuitem_disabled_text:#5c6470; --menuitem_normal_face:#2c3037;
+    --menuitem_hot_text:#2c3037; --menuitem_hot_face:#eeac4d; --menuitem_highlight_text:#2c3037; --menuitem_highlight_face:#eeac4d;
+    --window_face:#2c3037; --window_titlebar_text:#e7e9eb; --window_titlebar_face:#2c3037;
+    --editor_face:#2c3037; --editor_sprite_border:#1a1d22; --editor_sprite_bottom_border:#1a1d22; --editor_view_face:#21252b;
+    --listitem_normal_text:#e7e9eb; --listitem_normal_face:#2c3037; --listitem_selected_text:#2c3037; --listitem_selected_face:#eeac4d;
+    --slider_empty_text:#21252b; --slider_full_text:#e7e9eb;
+    --tab_normal_text:#858585; --tab_active_text:#e7e9eb; --tab_active_face:#2c3037;
+    --popup_window_border:#363b44; --tooltip_text:#e7e9eb; --tooltip_face:#377565;
+    --filelist_even_row_text:#e7e9eb; --filelist_even_row_face:#2c3037; --filelist_odd_row_text:#e7e9eb; --filelist_odd_row_face:#363b44;
+    --filelist_selected_row_text:#2c3037; --filelist_selected_row_face:#eeac4d; --filelist_disabled_row_text:#f23b3b;
+    --workspace:#2c3037; --workspace_text:#e7e9eb; --workspace_link:#6d95c0; --workspace_link_hover:#eeac4d;
+    --timeline_normal:#2c3037; --timeline_normal_text:#858585; --timeline_hover:#c6c6c6; --timeline_hover_text:#2c3037;
+    --timeline_active:#e7e9eb; --timeline_active_text:#2c3037; --timeline_active_hover:#6d95c0; --timeline_active_hover_text:#2c3037;
+    --timeline_clicked:#587584; --timeline_clicked_text:#e7e9eb; --timeline_focused_text:#2c3037; --timeline_padding:#2c3037;
+    --timeline_band_highlight:#587584; --timeline_band_bg:#3a4f6b;
+    --status_bar_text:#c6c6c6; --status_bar_face:#2c3037;
+    --flag_normal:#2c3037; --flag_active:#f23b3b; --flag_clicked:#363b44;
+    --select_box_ruler:#6d95c0; --select_box_grid:#79c3ab; --palette_entries_separator:#1a1d22;
+  }
+  * { box-sizing:border-box; }
+  html, body { margin:0; padding:0; font-family:-apple-system,Segoe UI,Roboto,sans-serif; background:#15171b; color:#e7e9eb; height:100vh; }
+  body { display:grid; grid-template-columns: 1fr 360px; gap:0; overflow:hidden; }
+  /* ========== LEFT: Mock Aseprite UI ========== */
+  .stage { padding:24px; overflow:auto; background:#0e1014; }
+  .help { font-size:12px; color:#858585; margin-bottom:12px; line-height:1.5; }
+  .help kbd { background:#21252b; padding:2px 6px; border-radius:3px; font-family:monospace; }
+
+  /* generic hover affordance for any region bound to a color slot */
+  [data-slot] { cursor:pointer; outline:1px dashed transparent; outline-offset:1px; transition:outline-color .12s; }
+  [data-slot]:hover { outline-color:#eeac4d; }
+
+  /* Aseprite window mock */
+  .ase-window {
+    width:760px; max-width:100%;
+    background: var(--window_face);
+    border:2px solid var(--popup_window_border);
+    font-family: ui-monospace,Consolas,monospace; font-size:13px;
+    box-shadow:0 8px 32px rgba(0,0,0,.6);
+  }
+  .titlebar {
+    background: var(--window_titlebar_face);
+    color: var(--window_titlebar_text);
+    padding:6px 10px; display:flex; align-items:center; justify-content:space-between;
+  }
+  .titlebar .btns { display:flex; gap:4px; }
+  .titlebar .btn  { width:18px; height:14px; background:var(--face); display:inline-block; text-align:center; line-height:14px; font-size:10px; color:var(--button_normal_text); }
+  .menubar {
+    background: var(--menuitem_normal_face); color: var(--menuitem_normal_text);
+    padding:0; display:flex;
+  }
+  .menubar .item { padding:4px 10px; }
+  .menubar .item.hot { background:var(--menuitem_hot_face); color:var(--menuitem_hot_text); }
+  .menubar .item.disabled { color:var(--menuitem_disabled_text); }
+  .body { display:grid; grid-template-columns:160px 1fr; min-height:300px; }
+  .sidebar {
+    background:var(--listitem_normal_face); color:var(--listitem_normal_text);
+    padding:6px 0; border-right:1px solid var(--popup_window_border);
+  }
+  .sidebar .row { padding:3px 12px; }
+  .sidebar .row.sel { background:var(--listitem_selected_face); color:var(--listitem_selected_text); }
+  .sidebar .row.disabled { color:var(--filelist_disabled_row_text); }
+  .panel { background:var(--workspace); padding:14px; }
+  .section-label { color:var(--separator_label); font-size:11px; margin:8px 0 6px; }
+  .editor-canvas { background:var(--editor_face); height:90px; margin:6px 0 12px; border:1px solid var(--editor_sprite_border); position:relative; }
+  .editor-canvas::after { content:""; position:absolute; left:8px; right:8px; top:8px; bottom:8px; background:var(--editor_view_face); }
+  .row { display:flex; gap:6px; align-items:center; margin:6px 0; }
+  .label { color:var(--text); }
+  .label-hot { color:var(--text_hot); background:var(--selected); padding:2px 6px; }
+  .text-disabled { color:var(--disabled); }
+  .input { background:var(--textbox_face); color:var(--textbox_text); padding:4px 8px; flex:1; font:inherit; border:1px solid var(--popup_window_border); }
+  .suffix { color:var(--entry_suffix); font-size:11px; }
+  .button { background:var(--face); color:var(--button_normal_text); padding:5px 14px; border:1px solid var(--popup_window_border); cursor:pointer; }
+  .button.hot { background:var(--hot_face); color:var(--button_hot_text); }
+  .button.sel { background:var(--selected); color:var(--button_selected_text); }
+  .check { display:inline-flex; align-items:center; gap:6px; }
+  .check .box { width:11px; height:11px; background:var(--face); border:1px solid var(--popup_window_border); display:inline-block; }
+  .check.hot .box { background:var(--check_hot_face); }
+  .check.foc .box { background:var(--check_focus_face); }
+  .radio { display:inline-flex; align-items:center; gap:6px; }
+  .radio .dot { width:11px; height:11px; border-radius:50%; background:var(--face); border:1px solid var(--popup_window_border); display:inline-block; }
+  .radio.hot .dot { background:var(--radio_hot_face); }
+  .radio.foc .dot { background:var(--radio_focus_face); }
+  a.link { color:var(--link_text); text-decoration:underline; }
+  a.link.hover { color:var(--link_hover); }
+  .ws-link { color:var(--workspace_link); text-decoration:underline; }
+  .ws-link.hover { color:var(--workspace_link_hover); }
+  .tooltip { background:var(--tooltip_face); color:var(--tooltip_text); padding:4px 8px; display:inline-block; }
+  .slider { display:flex; height:14px; width:200px; border:1px solid var(--popup_window_border); }
+  .slider .full { background:var(--selected); flex:0 0 65%; color:var(--slider_full_text); font-size:10px; padding-left:4px; line-height:12px; }
+  .slider .empty { background:var(--textbox_face); flex:1; color:var(--slider_empty_text); }
+  .tabs { display:flex; }
+  .tabs .tab { padding:4px 12px; background:var(--menuitem_normal_face); color:var(--tab_normal_text); }
+  .tabs .tab.active { background:var(--tab_active_face); color:var(--tab_active_text); }
+  .timeline { background:var(--timeline_normal); padding:6px; margin-top:8px; }
+  .timeline .frames { display:flex; gap:2px; }
+  .timeline .f { width:18px; height:14px; background:var(--timeline_padding); color:var(--timeline_normal_text); font-size:10px; text-align:center; line-height:14px; }
+  .timeline .f.hover { background:var(--timeline_hover); color:var(--timeline_hover_text); }
+  .timeline .f.active { background:var(--timeline_active); color:var(--timeline_active_text); }
+  .timeline .f.clicked { background:var(--timeline_clicked); color:var(--timeline_clicked_text); }
+  .timeline .band { height:4px; background:var(--timeline_band_bg); margin-top:2px; }
+  .timeline .band .hl { height:100%; background:var(--timeline_band_highlight); width:30%; }
+  .filelist { border:1px solid var(--popup_window_border); }
+  .filelist .row { padding:3px 8px; margin:0; display:block; }
+  .filelist .row.even { background:var(--filelist_even_row_face); color:var(--filelist_even_row_text); }
+  .filelist .row.odd  { background:var(--filelist_odd_row_face);  color:var(--filelist_odd_row_text); }
+  .filelist .row.sel  { background:var(--filelist_selected_row_face); color:var(--filelist_selected_row_text); }
+  .filelist .row.dis  { color:var(--filelist_disabled_row_text); }
+  .statusbar { background:var(--status_bar_face); color:var(--status_bar_text); padding:4px 10px; font-size:11px; border-top:1px solid var(--popup_window_border); }
+  .flag { display:inline-block; width:10px; height:10px; border-radius:50%; background:var(--flag_normal); margin-right:6px; }
+  .flag.active { background:var(--flag_active); }
+  .flag.clicked { background:var(--flag_clicked); }
+  .select-box { display:inline-block; width:120px; height:60px; background:var(--editor_face); position:relative; margin-right:8px; }
+  .select-box::before { content:""; position:absolute; left:0; top:30%; width:100%; height:1px; background:var(--select_box_ruler); }
+  .select-box::after  { content:""; position:absolute; left:30%; top:0; width:1px; height:100%; background:var(--select_box_grid); }
+  .palette-bar { display:flex; height:20px; border:1px solid var(--palette_entries_separator); }
+  .palette-bar .sw { flex:1; border-right:1px solid var(--palette_entries_separator); }
+
+  /* ========== RIGHT: Color list ========== */
+  .palette { background:#15171b; border-left:1px solid #21252b; overflow:auto; padding:12px 0; }
+  .palette h2 { font-size:13px; margin:0 12px 8px; color:#c6c6c6; font-weight:600; letter-spacing:.04em; text-transform:uppercase; }
+  .palette .row {
+    display:grid; grid-template-columns:18px 1fr 78px; align-items:center; gap:8px;
+    padding:3px 12px; cursor:pointer; font-size:12px;
+  }
+  .palette .row:hover { background:#1d2026; }
+  .palette .row.active { background:#2a2f37; }
+  .palette .sw { width:18px; height:14px; border:1px solid #000; }
+  .palette .name { font-family:ui-monospace,Consolas,monospace; color:#e7e9eb; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .palette .hex { font-family:ui-monospace,Consolas,monospace; color:#858585; text-align:right; }
+
+  .toolbar { display:flex; gap:6px; padding:8px 12px; border-bottom:1px solid #21252b; flex-wrap:wrap; }
+  .toolbar button, .toolbar label.btn {
+    background:#21252b; color:#e7e9eb; border:1px solid #2a2f37; padding:6px 12px; border-radius:4px; cursor:pointer; font-size:12px;
+  }
+  .toolbar button:hover, .toolbar label.btn:hover { background:#2a2f37; }
+  .toolbar input[type=file] { display:none; }
+  .picker {
+    position:fixed; padding:10px; background:#15171b; border:1px solid #2a2f37; border-radius:6px; z-index:50;
+    display:none; box-shadow:0 8px 32px rgba(0,0,0,.7); width:240px;
+  }
+  .picker.visible { display:block; }
+  .picker .label { font-family:ui-monospace,Consolas,monospace; font-size:12px; color:#c6c6c6; margin-bottom:8px; word-break:break-all; }
+  .picker .pk-body { display:flex; gap:10px; align-items:flex-start; margin-bottom:8px; }
+  .picker .pk-swatch { width:48px; height:64px; border:1px solid #000; flex:0 0 48px; }
+  .picker .pk-rgb { flex:1; display:flex; flex-direction:column; gap:4px; }
+  .picker .pk-rgb .row { display:grid; grid-template-columns:14px 1fr 32px; gap:6px; align-items:center; font-family:ui-monospace,Consolas,monospace; font-size:11px; color:#c6c6c6; }
+  .picker .pk-rgb input[type=range] { width:100%; margin:0; height:14px; }
+  .picker .pk-rgb input[type=range].r { accent-color:#e57373; }
+  .picker .pk-rgb input[type=range].g { accent-color:#81c784; }
+  .picker .pk-rgb input[type=range].b { accent-color:#64b5f6; }
+  .picker .pk-rgb .v { color:#e7e9eb; text-align:right; }
+  .picker .pk-row { display:flex; gap:6px; align-items:center; }
+  .picker input[type=text] { flex:1; font-family:ui-monospace,Consolas,monospace; font-size:12px; padding:5px; background:#0e1014; color:#e7e9eb; border:1px solid #2a2f37; border-radius:3px; }
+  .picker input[type=color] { width:36px; height:30px; border:1px solid #2a2f37; padding:0; background:none; cursor:pointer; border-radius:3px; }
+  .picker .btns { display:flex; gap:4px; margin-top:8px; }
+  .picker .btns button { flex:1; background:#21252b; color:#e7e9eb; border:1px solid #2a2f37; padding:5px 8px; cursor:pointer; border-radius:3px; font-size:11px; }
+  .picker .btns button:hover { background:#2a2f37; }
+  .toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:#377565; color:#fff; padding:10px 18px; border-radius:6px; font-size:13px; opacity:0; transition:opacity .25s; pointer-events:none; }
+  .toast.show { opacity:1; }
+</style>
+</head>
+<body>
+
+<div class="stage">
+  <div class="help">
+    Click any UI region or any swatch on the right → pick a color.
+    Hover shows the color slot name. <kbd>Export</kbd> downloads a patched <code>theme.xml</code>.
+    <kbd>Load</kbd> reads an existing <code>theme.xml</code> to seed colors.
+  </div>
+
+  <div class="ase-window">
+    <div class="titlebar">
+      <span data-slot="window_titlebar_text">Preferences</span>
+      <span class="btns">
+        <span class="btn" data-slot="window_titlebar_face">_</span>
+        <span class="btn" data-slot="window_titlebar_face">▢</span>
+        <span class="btn" data-slot="window_titlebar_face">×</span>
+      </span>
+    </div>
+    <div class="menubar">
+      <span class="item" data-slot="menuitem_normal_text">File</span>
+      <span class="item hot" data-slot="menuitem_hot_face">Edit</span>
+      <span class="item" data-slot="menuitem_normal_text">View</span>
+      <span class="item disabled" data-slot="menuitem_disabled_text">Layer</span>
+    </div>
+    <div class="body">
+      <div class="sidebar">
+        <div class="row" data-slot="listitem_normal_text">General</div>
+        <div class="row" data-slot="listitem_normal_text">Files</div>
+        <div class="row" data-slot="listitem_normal_text">Editor</div>
+        <div class="row sel" data-slot="listitem_selected_face">Theme</div>
+        <div class="row" data-slot="listitem_normal_text">Extensions</div>
+        <div class="row disabled" data-slot="filelist_disabled_row_text">(broken)</div>
+      </div>
+      <div class="panel">
+        <div class="section-label" data-slot="separator_label">— Customize Theme —</div>
+        <div class="row">
+          <span class="label" data-slot="text">Font:</span>
+          <input class="input" data-slot="textbox_face" value="Aseprite" />
+          <span class="suffix" data-slot="entry_suffix">px</span>
+        </div>
+        <div class="row">
+          <span class="label-hot" data-slot="selected">Active option</span>
+          <span class="text-disabled" data-slot="disabled">disabled label</span>
+        </div>
+        <div class="row">
+          <span class="check"><span class="box" data-slot="face"></span><span data-slot="text">normal</span></span>
+          <span class="check hot"><span class="box" data-slot="check_hot_face"></span><span data-slot="text">hover</span></span>
+          <span class="check foc"><span class="box" data-slot="check_focus_face"></span><span data-slot="text">focus</span></span>
+        </div>
+        <div class="row">
+          <span class="radio"><span class="dot" data-slot="face"></span><span data-slot="text">o</span></span>
+          <span class="radio hot"><span class="dot" data-slot="radio_hot_face"></span><span data-slot="text">o</span></span>
+          <span class="radio foc"><span class="dot" data-slot="radio_focus_face"></span><span data-slot="text">o</span></span>
+        </div>
+        <div class="row">
+          <a class="link" data-slot="link_text">link</a>
+          <a class="link hover" data-slot="link_hover">hovered link</a>
+          <span class="tooltip" data-slot="tooltip_face">tooltip</span>
+        </div>
+        <div class="row">
+          <div class="slider"><span class="full" data-slot="selected">65%</span><span class="empty" data-slot="textbox_face"></span></div>
+        </div>
+
+        <div class="section-label" data-slot="separator_label">— Editor Canvas —</div>
+        <div class="editor-canvas" data-slot="editor_face"></div>
+
+        <div class="section-label" data-slot="separator_label">— File List —</div>
+        <div class="filelist">
+          <div class="row even" data-slot="filelist_even_row_face">readme.md</div>
+          <div class="row odd"  data-slot="filelist_odd_row_face">sprite.aseprite</div>
+          <div class="row sel"  data-slot="filelist_selected_row_face">theme.xml</div>
+          <div class="row dis"  data-slot="filelist_disabled_row_text">missing.bin</div>
+        </div>
+
+        <div class="section-label" data-slot="separator_label">— Tabs &amp; Timeline —</div>
+        <div class="tabs">
+          <span class="tab active" data-slot="tab_active_face">sprite.aseprite</span>
+          <span class="tab" data-slot="tab_normal_text">untitled-2</span>
+          <span class="tab" data-slot="tab_normal_text">untitled-3</span>
+        </div>
+        <div class="timeline" data-slot="timeline_normal">
+          <div class="frames">
+            <span class="f">1</span><span class="f hover">2</span><span class="f active">3</span><span class="f clicked">4</span>
+            <span class="f" data-slot="timeline_padding">5</span><span class="f">6</span>
+          </div>
+          <div class="band" data-slot="timeline_band_bg"><div class="hl" data-slot="timeline_band_highlight"></div></div>
+        </div>
+
+        <div class="section-label" data-slot="separator_label">— Selection &amp; Palette —</div>
+        <div class="row">
+          <div class="select-box" data-slot="editor_face"></div>
+          <div>
+            <span class="flag active" data-slot="flag_active"></span>onion-skin
+            <br/>
+            <span class="flag" data-slot="flag_normal"></span>normal flag
+          </div>
+        </div>
+        <div class="palette-bar">
+          <span class="sw" style="background:#000"></span>
+          <span class="sw" style="background:#eeac4d"></span>
+          <span class="sw" style="background:#79c3ab"></span>
+          <span class="sw" style="background:#6d95c0"></span>
+          <span class="sw" style="background:#f23b3b"></span>
+          <span class="sw" style="background:#fff"></span>
+        </div>
+
+        <div class="row" style="margin-top:14px;">
+          <button class="button" data-slot="face">Apply</button>
+          <button class="button hot" data-slot="hot_face">Hover</button>
+          <button class="button sel" data-slot="selected">Selected</button>
+        </div>
+      </div>
+    </div>
+    <div class="statusbar" data-slot="status_bar_face">x:42  y:18  • RGBA  • <span data-slot="workspace_link">workspace link</span></div>
+  </div>
+</div>
+
+<aside class="palette">
+  <div class="toolbar">
+    <button id="btn-export">Export theme.xml</button>
+    <label class="btn">Load theme.xml<input id="file-load" type="file" accept=".xml" /></label>
+    <button id="btn-reset">Reset</button>
+    <button id="btn-copy-css">Copy CSS vars</button>
+  </div>
+  <h2>Color slots</h2>
+  <div id="color-list"></div>
+</aside>
+
+<div id="picker" class="picker">
+  <div class="label" id="picker-label">slot</div>
+  <div class="pk-body">
+    <div id="picker-swatch" class="pk-swatch"></div>
+    <div class="pk-rgb">
+      <div class="row"><span>R</span><input type="range" class="r" id="picker-r" min="0" max="255" /><span class="v" id="picker-r-val">0</span></div>
+      <div class="row"><span>G</span><input type="range" class="g" id="picker-g" min="0" max="255" /><span class="v" id="picker-g-val">0</span></div>
+      <div class="row"><span>B</span><input type="range" class="b" id="picker-b" min="0" max="255" /><span class="v" id="picker-b-val">0</span></div>
+    </div>
+  </div>
+  <div class="pk-row">
+    <input type="text" id="picker-hex" maxlength="9" placeholder="#rrggbb" />
+    <input type="color" id="picker-color" />
+  </div>
+  <div class="btns"><button id="picker-close">Close</button></div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+(function(){
+  // ---------- defaults: parsed from current theme.xml ----------
+  const DEFAULTS = {
+    text:'#e7e9eb', text_hot:'#2c3037', detail_text:'#21252b', disabled:'#5c6470',
+    face:'#2c3037', hot_face:'#3a4f6b', selected:'#eeac4d', selected_text:'#2c3037',
+    separator_label:'#6d95c0', background:'#2c3037',
+    textbox_text:'#e7e9eb', textbox_face:'#2c3037', textbox_code_face:'#363b44',
+    entry_suffix:'#c6c6c6', link_text:'#6d95c0', link_hover:'#eeac4d',
+    button_normal_text:'#e7e9eb', button_hot_text:'#e7e9eb', button_selected_text:'#e7e9eb',
+    check_hot_face:'#3a4f6b', check_focus_face:'#587584',
+    radio_hot_face:'#3a4f6b', radio_focus_face:'#587584',
+    menuitem_normal_text:'#e7e9eb', menuitem_disabled_text:'#5c6470', menuitem_normal_face:'#2c3037',
+    menuitem_hot_text:'#2c3037', menuitem_hot_face:'#eeac4d',
+    menuitem_highlight_text:'#2c3037', menuitem_highlight_face:'#eeac4d',
+    window_face:'#2c3037', window_titlebar_text:'#e7e9eb', window_titlebar_face:'#2c3037',
+    editor_face:'#2c3037', editor_sprite_border:'#1a1d22', editor_sprite_bottom_border:'#1a1d22', editor_view_face:'#21252b',
+    listitem_normal_text:'#e7e9eb', listitem_normal_face:'#2c3037',
+    listitem_selected_text:'#2c3037', listitem_selected_face:'#eeac4d',
+    slider_empty_text:'#21252b', slider_full_text:'#e7e9eb',
+    tab_normal_text:'#858585', tab_active_text:'#e7e9eb', tab_active_face:'#2c3037',
+    popup_window_border:'#363b44', tooltip_text:'#e7e9eb', tooltip_face:'#377565',
+    filelist_even_row_text:'#e7e9eb', filelist_even_row_face:'#2c3037',
+    filelist_odd_row_text:'#e7e9eb', filelist_odd_row_face:'#363b44',
+    filelist_selected_row_text:'#2c3037', filelist_selected_row_face:'#eeac4d',
+    filelist_disabled_row_text:'#f23b3b',
+    workspace:'#2c3037', workspace_text:'#e7e9eb', workspace_link:'#6d95c0', workspace_link_hover:'#eeac4d',
+    timeline_normal:'#2c3037', timeline_normal_text:'#858585', timeline_hover:'#c6c6c6', timeline_hover_text:'#2c3037',
+    timeline_active:'#e7e9eb', timeline_active_text:'#2c3037',
+    timeline_active_hover:'#6d95c0', timeline_active_hover_text:'#2c3037',
+    timeline_clicked:'#587584', timeline_clicked_text:'#e7e9eb',
+    timeline_focused_text:'#2c3037', timeline_padding:'#2c3037',
+    timeline_band_highlight:'#587584', timeline_band_bg:'#3a4f6b',
+    status_bar_text:'#c6c6c6', status_bar_face:'#2c3037',
+    flag_normal:'#2c3037', flag_active:'#f23b3b', flag_clicked:'#363b44',
+    select_box_ruler:'#6d95c0', select_box_grid:'#79c3ab',
+    palette_entries_separator:'#1a1d22',
+  };
+  // slot definitions where the loaded theme.xml might mark `new="true"`
+  const NEW_SLOTS = new Set(['text_hot','detail_text']);
+
+  // ---------- state ----------
+  let colors = Object.assign({}, DEFAULTS);
+  let originalXml = null;  // last loaded XML, for round-trip preservation
+
+  // ---------- DOM refs ----------
+  const root = document.documentElement;
+  const list = document.getElementById('color-list');
+  const picker = document.getElementById('picker');
+  const pkLabel = document.getElementById('picker-label');
+  const pkColor = document.getElementById('picker-color');
+  const pkHex = document.getElementById('picker-hex');
+  const pkClose = document.getElementById('picker-close');
+  const pkSwatch = document.getElementById('picker-swatch');
+  const pkR = document.getElementById('picker-r');
+  const pkG = document.getElementById('picker-g');
+  const pkB = document.getElementById('picker-b');
+  const pkRv = document.getElementById('picker-r-val');
+  const pkGv = document.getElementById('picker-g-val');
+  const pkBv = document.getElementById('picker-b-val');
+  const toast = document.getElementById('toast');
+
+  // ---------- color helpers ----------
+  function hexToRgb(hex) {
+    const h = hex.replace('#','').slice(0,6);
+    if (h.length !== 6 || !/^[0-9a-f]{6}$/i.test(h)) return null;
+    return { r:parseInt(h.slice(0,2),16), g:parseInt(h.slice(2,4),16), b:parseInt(h.slice(4,6),16) };
+  }
+  function rgbToHex(r,g,b) {
+    const p = n => Math.max(0,Math.min(255,Math.round(n))).toString(16).padStart(2,'0');
+    return '#' + p(r) + p(g) + p(b);
+  }
+
+  // ---------- helpers ----------
+  function applyColor(slot, hex) {
+    colors[slot] = hex;
+    root.style.setProperty('--' + slot, hex);
+    const sw = list.querySelector(`.row[data-slot="${slot}"] .sw`);
+    const hx = list.querySelector(`.row[data-slot="${slot}"] .hex`);
+    if (sw) sw.style.background = hex;
+    if (hx) hx.textContent = hex;
+  }
+  function applyAll(map) {
+    for (const k of Object.keys(map)) applyColor(k, map[k]);
+  }
+  function renderList(activeSlot) {
+    list.innerHTML = '';
+    const keys = Object.keys(colors).sort();
+    for (const slot of keys) {
+      const row = document.createElement('div');
+      row.className = 'row' + (slot === activeSlot ? ' active' : '');
+      row.dataset.slot = slot;
+      row.innerHTML = `<span class="sw" style="background:${colors[slot]}"></span><span class="name">${slot}</span><span class="hex">${colors[slot]}</span>`;
+      row.addEventListener('click', e => openPicker(slot, e.target));
+      list.appendChild(row);
+    }
+  }
+  function showToast(msg) {
+    toast.textContent = msg;
+    toast.classList.add('show');
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(() => toast.classList.remove('show'), 1600);
+  }
+
+  // ---------- picker ----------
+  let activeSlot = null;
+  let suppressPickerSync = false;
+  function syncPickerInputs(hex) {
+    suppressPickerSync = true;
+    const rgb = hexToRgb(hex) || { r:0, g:0, b:0 };
+    pkR.value = rgb.r; pkG.value = rgb.g; pkB.value = rgb.b;
+    pkRv.textContent = rgb.r; pkGv.textContent = rgb.g; pkBv.textContent = rgb.b;
+    pkHex.value = hex;
+    pkColor.value = hex.slice(0,7);
+    pkSwatch.style.background = hex;
+    suppressPickerSync = false;
+  }
+  function pickerCommit(hex) {
+    if (!activeSlot) return;
+    applyColor(activeSlot, hex);
+    syncPickerInputs(hex);
+  }
+  function openPicker(slot, target) {
+    activeSlot = slot;
+    pkLabel.textContent = slot;
+    syncPickerInputs(colors[slot]);
+    const r = (target && target.getBoundingClientRect) ? target.getBoundingClientRect() : { right:200, top:100 };
+    const W = 260, H = 200;
+    let x = Math.min(r.right + 8, window.innerWidth - W - 8);
+    let y = Math.min(Math.max(r.top, 8), window.innerHeight - H - 8);
+    picker.style.left = x + 'px'; picker.style.top = y + 'px';
+    picker.classList.add('visible');
+    renderList(slot);
+  }
+  function closePicker() { picker.classList.remove('visible'); activeSlot = null; renderList(null); }
+
+  // RGB sliders — fire on every drag tick
+  function fromSliders() {
+    if (suppressPickerSync || !activeSlot) return;
+    pickerCommit(rgbToHex(+pkR.value, +pkG.value, +pkB.value));
+  }
+  ['input','change'].forEach(ev => {
+    pkR.addEventListener(ev, fromSliders);
+    pkG.addEventListener(ev, fromSliders);
+    pkB.addEventListener(ev, fromSliders);
+  });
+
+  // Hex text input — live as you type
+  pkHex.addEventListener('input', e => {
+    if (suppressPickerSync || !activeSlot) return;
+    let v = e.target.value.trim();
+    if (v && v[0] !== '#') v = '#' + v;
+    if (!/^#[0-9a-f]{6}([0-9a-f]{2})?$/i.test(v)) return;
+    pickerCommit(v);
+  });
+
+  // Native color input — both events for cross-browser coverage
+  ['input','change'].forEach(ev => pkColor.addEventListener(ev, e => {
+    if (suppressPickerSync || !activeSlot) return;
+    pickerCommit(e.target.value);
+  }));
+
+  pkClose.addEventListener('click', closePicker);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closePicker(); });
+  document.addEventListener('mousedown', e => {
+    if (!picker.classList.contains('visible')) return;
+    if (picker.contains(e.target)) return;
+    if (e.target.closest('[data-slot]') || e.target.closest('.palette .row')) return;
+    closePicker();
+  });
+
+  // ---------- bind preview regions ----------
+  document.querySelectorAll('.stage [data-slot]').forEach(el => {
+    el.addEventListener('click', e => { e.stopPropagation(); openPicker(el.dataset.slot, el); });
+    el.title = el.dataset.slot;
+  });
+
+  // ---------- export ----------
+  function buildXml() {
+    if (originalXml) {
+      // round-trip: preserve everything else, replace only color values inside <colors>
+      let out = originalXml;
+      for (const slot of Object.keys(colors)) {
+        const re = new RegExp(`(<color\\s+id="${slot}"\\s+value=")[^"]*(")`, 'g');
+        out = out.replace(re, `$1${colors[slot]}$2`);
+      }
+      return out;
+    }
+    // standalone: just emit a <colors> block (rare path)
+    let body = '';
+    for (const slot of Object.keys(colors)) {
+      const newAttr = NEW_SLOTS.has(slot) ? ' new="true"' : '';
+      body += `        <color id="${slot}" value="${colors[slot]}"${newAttr}/>\n`;
+    }
+    return `<colors>\n${body}    </colors>\n`;
+  }
+  document.getElementById('btn-export').addEventListener('click', () => {
+    const blob = new Blob([buildXml()], { type:'application/xml' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'theme.xml';
+    a.click();
+    URL.revokeObjectURL(a.href);
+    showToast('theme.xml downloaded');
+  });
+
+  // ---------- load ----------
+  document.getElementById('file-load').addEventListener('change', async e => {
+    const f = e.target.files[0]; if (!f) return;
+    const txt = await f.text();
+    originalXml = txt;
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(txt, 'application/xml');
+    const nodes = doc.querySelectorAll('colors > color');
+    if (!nodes.length) { showToast('No <color> elements found'); return; }
+    const map = {};
+    for (const n of nodes) {
+      const id = n.getAttribute('id'); const val = n.getAttribute('value');
+      if (id && val) map[id] = val;
+    }
+    colors = Object.assign({}, DEFAULTS, map);
+    applyAll(colors);
+    renderList(null);
+    showToast(`Loaded ${nodes.length} colors`);
+  });
+
+  // ---------- reset ----------
+  document.getElementById('btn-reset').addEventListener('click', () => {
+    colors = Object.assign({}, DEFAULTS);
+    originalXml = null;
+    applyAll(colors); renderList(null);
+    showToast('Reset to Frigus Nox defaults');
+  });
+  document.getElementById('btn-copy-css').addEventListener('click', async () => {
+    const css = ':root {\n' + Object.keys(colors).map(k => `  --${k}: ${colors[k]};`).join('\n') + '\n}';
+    try { await navigator.clipboard.writeText(css); showToast('CSS vars copied'); }
+    catch { showToast('Clipboard blocked — open devtools'); console.log(css); }
+  });
+
+  // ---------- init ----------
+  renderList(null);
+})();
+</script>
+
+</body>
+</html>

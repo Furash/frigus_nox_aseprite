@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Sheet Viewer — Frigus Nox</title>
+<style>
+  html, body { margin:0; padding:0; background:#15171b; color:#e7e9eb;
+               font-family:ui-monospace,Consolas,monospace; height:100vh; overflow:hidden; }
+  body { display:grid; grid-template-rows:auto 1fr auto; }
+  .toolbar { display:flex; gap:8px; align-items:center; padding:8px 12px;
+             background:#21252b; border-bottom:1px solid #2a2f37; font-size:12px; flex-wrap:wrap; }
+  .toolbar button, .toolbar label.btn {
+    background:#2c3037; color:#e7e9eb; border:1px solid #3a4046;
+    padding:5px 10px; border-radius:3px; cursor:pointer; font:inherit;
+  }
+  .toolbar button:hover, .toolbar label.btn:hover { background:#3a4046; }
+  .toolbar input[type=file] { display:none; }
+  .toolbar .sep { width:1px; height:18px; background:#3a4046; margin:0 4px; }
+  .toolbar .info { color:#858585; }
+
+  :root { --bg:#0e1014; --checker:#1a1d22; }
+  .stage { overflow:auto; background-color:var(--bg);
+           background-image:
+             linear-gradient(45deg, var(--checker) 25%, transparent 25%),
+             linear-gradient(-45deg, var(--checker) 25%, transparent 25%),
+             linear-gradient(45deg, transparent 75%, var(--checker) 75%),
+             linear-gradient(-45deg, transparent 75%, var(--checker) 75%);
+           background-size:16px 16px; background-position:0 0,0 8px,8px -8px,-8px 0; }
+  .stage.no-checker { background-image:none; }
+  .toolbar input[type=color] { width:24px; height:24px; padding:0; border:1px solid #3a4046;
+                               background:none; cursor:pointer; vertical-align:middle; border-radius:3px; }
+  .canvas-wrap { position:relative; display:inline-block; margin:24px;
+                 box-shadow:0 0 0 1px #000, 0 8px 32px rgba(0,0,0,.5); }
+  #sheet { display:block; image-rendering:pixelated; image-rendering:crisp-edges; }
+  #overlay { position:absolute; left:0; top:0; pointer-events:none; }
+  #cursor-rect { position:absolute; border:1px solid #eeac4d;
+                 box-shadow:0 0 0 1px #000 inset; pointer-events:none; display:none; }
+  #popup { position:fixed; pointer-events:none; display:none; z-index:50;
+           background:#21252b; color:#e7e9eb; padding:6px 9px;
+           font:12px ui-monospace,Consolas,monospace; border:1px solid #000;
+           box-shadow:0 4px 16px rgba(0,0,0,.7); max-width:380px; }
+  #popup .title { color:#eeac4d; font-weight:bold; }
+  #popup .title .more { color:#858585; font-weight:normal; margin-left:6px; }
+  #popup .uses { margin-top:5px; padding-top:5px; border-top:1px solid #3a4046;
+                 color:#c6c6c6; font-size:11px; line-height:1.5; }
+  #popup .uses .none { color:#5c6470; font-style:italic; }
+  #popup .uses .style { color:#79c3ab; }
+  #popup .uses .role { color:#6d95c0; }
+  #popup .uses .state { color:#858585; }
+  #popup .uses .extra { color:#5c6470; margin-top:3px; }
+  #popup .alt { margin-top:5px; padding-top:5px; border-top:1px solid #3a4046;
+                color:#858585; font-size:11px; }
+  #popup .alt .id { color:#c6c6c6; }
+
+  .statusbar { background:#21252b; color:#e7e9eb; padding:6px 12px; font-size:12px;
+               border-top:1px solid #2a2f37; min-height:22px;
+               white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .statusbar .px { color:#6d95c0; margin-right:14px; }
+  .statusbar .hit { color:#eeac4d; }
+  .statusbar .hit + .hit::before { content:"  ·  "; color:#5c6470; }
+  .statusbar .empty { color:#5c6470; }
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <label class="btn">Load sheet.png<input id="file-png" type="file" accept="image/png,image/*" /></label>
+  <label class="btn">Load theme.xml<input id="file-xml" type="file" accept=".xml" /></label>
+  <span class="sep"></span>
+  <button id="zoom-out">−</button>
+  <span id="zoom-label" class="info">1×</span>
+  <button id="zoom-in">+</button>
+  <span class="sep"></span>
+  <label class="info"><input id="show-grid" type="checkbox" /> outline all parts</label>
+  <span class="sep"></span>
+  <label class="info">BG <input id="bg-color" type="color" value="#0e1014" /></label>
+  <label class="info">checker <input id="checker-color" type="color" value="#1a1d22" /></label>
+  <label class="info"><input id="checker-on" type="checkbox" checked /> on</label>
+  <span class="sep"></span>
+  <button id="btn-clear">Clear cache</button>
+  <span class="sep"></span>
+  <span id="meta" class="info">no sheet</span>
+</div>
+
+<div class="stage" id="stage">
+  <div class="canvas-wrap" id="wrap">
+    <img id="sheet" alt="" />
+    <canvas id="overlay"></canvas>
+    <div id="cursor-rect"></div>
+  </div>
+</div>
+
+<div id="popup"></div>
+
+<div class="statusbar" id="status"><span class="empty">hover the sheet</span></div>
+
+<script>
+(function(){
+  const img = document.getElementById('sheet');
+  const overlay = document.getElementById('overlay');
+  const wrap = document.getElementById('wrap');
+  const cursorRect = document.getElementById('cursor-rect');
+  const popup = document.getElementById('popup');
+  const status = document.getElementById('status');
+  const meta = document.getElementById('meta');
+  const zoomLabel = document.getElementById('zoom-label');
+  const showGrid = document.getElementById('show-grid');
+
+  let parts = [];        // {id, x, y, w, h}
+  let partUses = {};     // partId -> [{styleId, role, state}]
+  let imgW = 0, imgH = 0;
+  let zoom = 2;
+
+  // ---------- persistence (localStorage) ----------
+  const LS_SHEET = 'frigus.sheet.dataurl';
+  const LS_XML   = 'frigus.theme.xml';
+  const LS_ZOOM  = 'frigus.zoom';
+  const LS_BG    = 'frigus.bg';
+  const LS_CHKC  = 'frigus.checker.color';
+  const LS_CHKO  = 'frigus.checker.on';
+
+  function saveSheet(dataUrl) { try { localStorage.setItem(LS_SHEET, dataUrl); } catch {} }
+  function saveXml(text)      { try { localStorage.setItem(LS_XML, text); }      catch {} }
+  function saveZoom(z)        { try { localStorage.setItem(LS_ZOOM, String(z)); } catch {} }
+  function loadSavedSheet()   { try { return localStorage.getItem(LS_SHEET); } catch { return null; } }
+  function loadSavedXml()     { try { return localStorage.getItem(LS_XML); }   catch { return null; } }
+  function loadSavedZoom()    { try { const v = +localStorage.getItem(LS_ZOOM); return v >= 1 && v <= 16 ? v : null; } catch { return null; } }
+
+  function blobToDataUrl(blob) {
+    return new Promise((resolve, reject) => {
+      const fr = new FileReader();
+      fr.onload = () => resolve(fr.result);
+      fr.onerror = reject;
+      fr.readAsDataURL(blob);
+    });
+  }
+
+  // ---------- load ----------
+  function setSheet(url) {
+    img.onload = () => {
+      imgW = img.naturalWidth; imgH = img.naturalHeight;
+      meta.textContent = `${imgW}×${imgH}px · ${parts.length} parts`;
+      applyZoom();
+    };
+    img.src = url;
+  }
+
+  function parseTheme(xmlText) {
+    const doc = new DOMParser().parseFromString(xmlText, 'application/xml');
+    const partNodes = doc.querySelectorAll('parts > part, part');
+    const outParts = [];
+    for (const n of partNodes) {
+      const id = n.getAttribute('id');
+      const x = +n.getAttribute('x');
+      const y = +n.getAttribute('y');
+      let w, h;
+      if (n.hasAttribute('w')) {
+        w = +n.getAttribute('w');
+        h = +n.getAttribute('h');
+      } else if (n.hasAttribute('w1')) {
+        w = (+n.getAttribute('w1') || 0) + (+n.getAttribute('w2') || 0) + (+n.getAttribute('w3') || 0);
+        h = (+n.getAttribute('h1') || 0) + (+n.getAttribute('h2') || 0) + (+n.getAttribute('h3') || 0);
+      } else continue;
+      if (!id || !w || !h) continue;
+      outParts.push({ id, x, y, w, h });
+    }
+
+    // Cross-reference: walk every <style> and record which parts it uses.
+    const uses = {};
+    for (const styleEl of doc.querySelectorAll('styles > style, style')) {
+      const styleId = styleEl.getAttribute('id') || '(unnamed)';
+      for (const child of styleEl.querySelectorAll('[part]')) {
+        const partId = child.getAttribute('part');
+        if (!partId) continue;
+        (uses[partId] ||= []).push({
+          styleId,
+          role: child.tagName,                   // background, border, icon, ...
+          state: child.getAttribute('state') || '',
+        });
+      }
+    }
+    partUses = uses;
+    return outParts;
+  }
+
+  async function tryAutoLoad() {
+    let png = null, xml = null;
+    try {
+      [png, xml] = await Promise.all([
+        fetch('../sheet.png').then(r => r.ok ? r.blob() : null).catch(() => null),
+        fetch('../theme.xml').then(r => r.ok ? r.text() : null).catch(() => null),
+      ]);
+    } catch {}
+
+    // fall back to last-loaded copies in localStorage
+    let sheetSource = 'fetch', xmlSource = 'fetch';
+    if (!xml) { xml = loadSavedXml(); if (xml) xmlSource = 'cache'; }
+    let pngDataUrl = null;
+    if (png) {
+      pngDataUrl = await blobToDataUrl(png);
+    } else {
+      pngDataUrl = loadSavedSheet();
+      if (pngDataUrl) sheetSource = 'cache';
+    }
+
+    if (xml) { parts = parseTheme(xml); saveXml(xml); }
+    if (pngDataUrl) { setSheet(pngDataUrl); saveSheet(pngDataUrl); }
+
+    if (pngDataUrl || xml) {
+      const tags = [];
+      if (pngDataUrl) tags.push(`sheet:${sheetSource}`);
+      if (xml) tags.push(`theme:${xmlSource}`);
+      status.innerHTML = `<span class="empty">loaded (${tags.join(', ')})</span>`;
+    } else {
+      status.innerHTML = '<span class="empty">no sheet/theme yet — use the toolbar buttons</span>';
+    }
+  }
+
+  document.getElementById('file-png').addEventListener('change', async e => {
+    const f = e.target.files[0]; if (!f) return;
+    const dataUrl = await blobToDataUrl(f);
+    saveSheet(dataUrl);
+    setSheet(dataUrl);
+  });
+  document.getElementById('file-xml').addEventListener('change', async e => {
+    const f = e.target.files[0]; if (!f) return;
+    const text = await f.text();
+    saveXml(text);
+    parts = parseTheme(text);
+    meta.textContent = `${imgW}×${imgH}px · ${parts.length} parts`;
+    drawOverlay();
+  });
+
+  // ---------- zoom ----------
+  function applyZoom() {
+    if (!imgW) return;
+    const w = imgW * zoom, h = imgH * zoom;
+    img.style.width = w + 'px'; img.style.height = h + 'px';
+    overlay.width = w; overlay.height = h;
+    overlay.style.width = w + 'px'; overlay.style.height = h + 'px';
+    zoomLabel.textContent = zoom + '×';
+    drawOverlay();
+  }
+  document.getElementById('zoom-in').addEventListener('click', () => { zoom = Math.min(16, zoom + 1); applyZoom(); saveZoom(zoom); });
+  document.getElementById('zoom-out').addEventListener('click', () => { zoom = Math.max(1, zoom - 1); applyZoom(); saveZoom(zoom); });
+  showGrid.addEventListener('change', drawOverlay);
+  document.getElementById('btn-clear').addEventListener('click', () => {
+    try {
+      [LS_SHEET, LS_XML, LS_ZOOM, LS_BG, LS_CHKC, LS_CHKO].forEach(k => localStorage.removeItem(k));
+    } catch {}
+    status.innerHTML = '<span class="empty">cache cleared — reload the page</span>';
+  });
+
+  // restore last zoom (before image loads — applyZoom is a no-op until imgW set)
+  { const z = loadSavedZoom(); if (z) zoom = z; }
+
+  // ---------- background colors ----------
+  const stage = document.getElementById('stage');
+  const bgInput = document.getElementById('bg-color');
+  const chkColorInput = document.getElementById('checker-color');
+  const chkOnInput = document.getElementById('checker-on');
+  const isHex = v => /^#[0-9a-f]{6}$/i.test(v || '');
+
+  function applyBg(bg, chkColor, chkOn) {
+    document.documentElement.style.setProperty('--bg', bg);
+    document.documentElement.style.setProperty('--checker', chkColor);
+    stage.classList.toggle('no-checker', !chkOn);
+  }
+  function readBg() {
+    const bg = isHex(bgInput.value) ? bgInput.value : '#0e1014';
+    const ck = isHex(chkColorInput.value) ? chkColorInput.value : '#1a1d22';
+    const on = chkOnInput.checked;
+    applyBg(bg, ck, on);
+    try {
+      localStorage.setItem(LS_BG, bg);
+      localStorage.setItem(LS_CHKC, ck);
+      localStorage.setItem(LS_CHKO, on ? '1' : '0');
+    } catch {}
+  }
+  // restore
+  try {
+    const bg = localStorage.getItem(LS_BG);
+    const ck = localStorage.getItem(LS_CHKC);
+    const on = localStorage.getItem(LS_CHKO);
+    if (isHex(bg)) bgInput.value = bg;
+    if (isHex(ck)) chkColorInput.value = ck;
+    if (on !== null) chkOnInput.checked = on === '1';
+  } catch {}
+  applyBg(bgInput.value, chkColorInput.value, chkOnInput.checked);
+
+  ['input', 'change'].forEach(ev => {
+    bgInput.addEventListener(ev, readBg);
+    chkColorInput.addEventListener(ev, readBg);
+  });
+  chkOnInput.addEventListener('change', readBg);
+
+  function drawOverlay() {
+    const ctx = overlay.getContext('2d');
+    ctx.clearRect(0, 0, overlay.width, overlay.height);
+    if (!showGrid.checked) return;
+    ctx.strokeStyle = 'rgba(238,172,77,0.55)';
+    ctx.lineWidth = 1;
+    for (const p of parts) {
+      ctx.strokeRect(p.x * zoom + 0.5, p.y * zoom + 0.5, p.w * zoom - 1, p.h * zoom - 1);
+    }
+  }
+
+  // ---------- hover ----------
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  function renderPopup(tight, hits) {
+    const more = hits.length > 1 ? `<span class="more">+${hits.length - 1} overlapping</span>` : '';
+    let html = `<div class="title">${esc(tight.id)} ${more}</div>`;
+    const uses = partUses[tight.id] || [];
+    if (!uses.length) {
+      html += `<div class="uses"><span class="none">no &lt;style&gt; reference — used directly by Aseprite C++ (e.g. cursor / built-in)</span></div>`;
+    } else {
+      const MAX = 8;
+      const rows = uses.slice(0, MAX).map(u => {
+        const state = u.state ? ` <span class="state">[${esc(u.state)}]</span>` : '';
+        return `<div><span class="role">${esc(u.role)}</span> in <span class="style">${esc(u.styleId)}</span>${state}</div>`;
+      }).join('');
+      const extra = uses.length > MAX ? `<div class="extra">+${uses.length - MAX} more…</div>` : '';
+      html += `<div class="uses">${rows}${extra}</div>`;
+    }
+    if (hits.length > 1) {
+      const others = hits.filter(h => h !== tight).map(h => `<span class="id">${esc(h.id)}</span>`).join(', ');
+      html += `<div class="alt">also covers: ${others}</div>`;
+    }
+    return html;
+  }
+
+  function partsAt(px, py) {
+    const hits = [];
+    for (const p of parts) {
+      if (px >= p.x && px < p.x + p.w && py >= p.y && py < p.y + p.h) hits.push(p);
+    }
+    return hits;
+  }
+
+  wrap.addEventListener('mousemove', e => {
+    if (!imgW) return;
+    const r = img.getBoundingClientRect();
+    const px = Math.floor((e.clientX - r.left) / zoom);
+    const py = Math.floor((e.clientY - r.top) / zoom);
+    if (px < 0 || py < 0 || px >= imgW || py >= imgH) return;
+    const hits = partsAt(px, py);
+
+    let html = `<span class="px">x:${px} y:${py}</span>`;
+    if (hits.length) {
+      html += hits.map(h => `<span class="hit">${h.id}</span>`).join('');
+      // tightest hit (smallest area) drives the highlight rect — usually the most specific
+      const tight = hits.reduce((a, b) => (a.w * a.h <= b.w * b.h ? a : b));
+      cursorRect.style.display = 'block';
+      cursorRect.style.left = (tight.x * zoom) + 'px';
+      cursorRect.style.top = (tight.y * zoom) + 'px';
+      cursorRect.style.width = (tight.w * zoom) + 'px';
+      cursorRect.style.height = (tight.h * zoom) + 'px';
+
+      popup.innerHTML = renderPopup(tight, hits);
+      popup.style.display = 'block';
+      const pw = popup.offsetWidth, ph = popup.offsetHeight;
+      let px2 = e.clientX + 14, py2 = e.clientY + 16;
+      if (px2 + pw > window.innerWidth - 4) px2 = e.clientX - pw - 10;
+      if (py2 + ph > window.innerHeight - 4) py2 = e.clientY - ph - 10;
+      popup.style.left = px2 + 'px';
+      popup.style.top = py2 + 'px';
+    } else {
+      html += `<span class="empty">no part</span>`;
+      cursorRect.style.display = 'none';
+      popup.style.display = 'none';
+    }
+    status.innerHTML = html;
+  });
+  wrap.addEventListener('mouseleave', () => {
+    cursorRect.style.display = 'none';
+    popup.style.display = 'none';
+    status.innerHTML = '<span class="empty">hover the sheet</span>';
+  });
+
+  tryAutoLoad();
+})();
+</script>
+
+</body>
+</html>

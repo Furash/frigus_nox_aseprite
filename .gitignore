@@ -1,0 +1,19 @@
+# Build artifacts
+*.aseprite-extension
+*.orig
+*.bak
+*.zip
+_sheet.png
+
+# Editors / IDEs
+.claude/
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS junk
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store

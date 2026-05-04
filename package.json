@@ -1,0 +1,15 @@
+{
+  "name": "frigus-nox",
+  "displayName": "Frigus Nox",
+  "description": "Aseprite theme matching the Frigus Nox Neovim colorscheme by Furash",
+  "version": "1.0.0",
+  "author": { "name": "local build" },
+  "publisher": "local",
+  "license": "CC-BY-4.0",
+  "categories": [ "Themes" ],
+  "contributes": {
+    "themes": [
+      { "id": "frigus-nox", "path": ".", "variant": "Dark" }
+    ]
+  }
+}
