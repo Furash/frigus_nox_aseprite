@@ -18,7 +18,7 @@ Aseprite theme matching the [Frigus Nox Neovim colorscheme](https://github.com/F
 
 ### Option B — Install the released `.aseprite-extension`
 
-Grab the latest `.aseprite-extension` from the [Releases page](https://github.com/Furash/frigus_nox_aseprite/releases) and double-click it (or *Edit → Preferences → Extensions → Add Extension*).
+Grab the latest `.aseprite-extension` from the [Releases page](https://github.com/Furash/frigus_nox_aseprite/releases), then in Aseprite go to *Edit → Preferences → Extensions → Add Extension* and select the file.
 
 ## Files
 
